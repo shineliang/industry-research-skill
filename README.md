@@ -1,5 +1,7 @@
 # Industry Research Skill for Claude Code
 
+**English** | [中文](./README_CN.md)
+
 Multi-agent collaborative industry research powered by Claude Code. Dynamically assigns research roles, runs parallel research with Codex/Gemini CLI augmentation, iterative quality review, merge & converge — outputs structured Markdown reports.
 
 ## How It Works
