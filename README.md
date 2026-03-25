@@ -1,8 +1,15 @@
-# Industry Research Skill for Claude Code
+# Industry Research Skill
 
 **English** | [中文](./README_CN.md)
 
-Multi-agent collaborative industry research powered by Claude Code. Dynamically assigns research roles, runs parallel research with Codex/Gemini CLI augmentation, iterative quality review, merge & converge — outputs structured Markdown reports.
+Multi-agent collaborative industry research. Dynamically assigns research roles, runs parallel research with Codex/Gemini/Claude CLI augmentation, iterative quality review, merge & converge — outputs structured Markdown reports.
+
+**Supports two platforms:**
+
+| Platform | Skill Location | Agent Orchestration |
+|----------|---------------|---------------------|
+| **Claude Code** | [`SKILL.md`](./SKILL.md) | Synchronous (Agent tool) |
+| **OpenClaw** | [`openclaw/SKILL.md`](./openclaw/SKILL.md) | Asynchronous (sessions_spawn + announce) |
 
 ## How It Works
 
@@ -63,26 +70,35 @@ User: /research AI Agent 行业现状
 
 ## Installation
 
-Copy the skill file to your Claude Code skills directory:
+### Claude Code
 
 ```bash
-# Clone the repo
 git clone https://github.com/shineliang/industry-research-skill.git
-
-# Copy skill to Claude Code
 mkdir -p ~/.claude/skills/industry-research
 cp industry-research-skill/SKILL.md ~/.claude/skills/industry-research/SKILL.md
 ```
 
 Or manually: download [`SKILL.md`](./SKILL.md) and place it at `~/.claude/skills/industry-research/SKILL.md`.
 
+### OpenClaw
+
+```bash
+git clone https://github.com/shineliang/industry-research-skill.git
+cp -r industry-research-skill/openclaw ~/.openclaw/skills/industry-research
+# Verify
+openclaw skills list
+```
+
+Or manually: copy the entire `openclaw/` directory to `~/.openclaw/skills/industry-research/`.
+
 ### Prerequisites
 
-- **Claude Code** (required) — The orchestrator runtime
+- **Claude Code** or **OpenClaw** (required) — The orchestrator runtime
 - **Codex CLI** (optional) — `npm install -g @openai/codex` — Provides OpenAI model perspectives
 - **Gemini CLI** (optional) — `npm install -g @google/gemini-cli` — Provides Google model perspectives
+- **Claude CLI** (optional) — `npm install -g @anthropic-ai/claude-code` — Provides Anthropic model perspectives
 
-CLI tools are optional. If unavailable, the skill falls back gracefully (WebSearch only, no blocking).
+CLI tools are optional. If unavailable, the skill falls back gracefully (web search only, no blocking).
 
 ## Usage
 
@@ -103,8 +119,8 @@ All parameters support three-level override: **Environment variables > Interacti
 | Merge iterations | `MERGE_MAX_ROUNDS` | `2` | Max merge review cycles |
 | Quality threshold | `QUALITY_THRESHOLD` | `35` | Out of 50 total |
 | Min per dimension | `QUALITY_MIN_PER_DIM` | `6` | Out of 10 per dimension |
-| CLI tools | `RESEARCH_CLI_TOOLS` | `codex,gemini` | `codex`, `gemini`, `both`, `none` |
-| CLI timeout | `RESEARCH_CLI_TIMEOUT` | `600000` | Milliseconds |
+| CLI tools | `RESEARCH_CLI_TOOLS` | `codex,gemini,claude` | `codex`, `gemini`, `claude`, or combinations |
+| CLI timeout | `RESEARCH_CLI_TIMEOUT` | `600000` | Milliseconds (CC) / `600` seconds (OpenClaw) |
 | Language | `RESEARCH_LANG` | `zh` | `zh` or `en` |
 | Depth preset | `RESEARCH_DEPTH` | `standard` | `quick`, `standard`, `deep` |
 
@@ -257,16 +273,15 @@ Round 2:
 
 ### CLI Invocation Protocol
 
-Sub-agents invoke Codex/Gemini CLI with a degradation retry chain:
+Sub-agents invoke Codex/Gemini/Claude CLI with a degradation retry chain:
 
 ```
-Codex:  xhigh → high → medium → low → Claude fallback
-Gemini: full prompt → simplified → reduced dimensions → Claude fallback
+Preferred CLI → Second CLI → Third CLI → Self-analysis fallback
 ```
 
-- Timeout: 600,000ms (10 min) per CLI call
+- Timeout: 600s (10 min) per CLI call
 - Temp files for isolation: `mktemp /tmp/research-XXXXXX.txt`
-- CLI unavailable: skip gracefully (research continues with WebSearch only)
+- CLI unavailable: skip gracefully (research continues with web search only)
 
 ### Quality Gate
 
@@ -309,7 +324,7 @@ Modify the output template in the "研究 Agent Prompt" section of `SKILL.md`. A
 
 ### Using Without CLI Tools
 
-Set `RESEARCH_CLI_TOOLS=none` or simply don't install Codex/Gemini. The skill works entirely with Claude Code's WebSearch.
+Set `RESEARCH_CLI_TOOLS=none` or simply don't install Codex/Gemini/Claude CLI. The skill works entirely with web search.
 
 ---
 
