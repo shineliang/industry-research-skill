@@ -73,7 +73,26 @@ metadata:
 
 收到调研主题后，**先完成配置再开始调研**：
 
-1. 读取环境变量覆盖默认值：
+1. **检查历史调研残留（防污染）**：
+   扫描工作目录下是否存在历史调研产出：
+   ```bash
+   ls -d */round-1 */merged */output 2>/dev/null | sed 's|/.*||' | sort -u
+   ```
+   - **如果发现历史调研目录**：向用户列出这些目录及其创建时间，并询问：
+     > 检测到以下历史调研目录，它们可能干扰本次调研（旧报告内容可能被误引用、旧 progress/task_plan 可能干扰状态判断）：
+     > - `{dir1}/` ({date1})
+     > - `{dir2}/` ({date2})
+     >
+     > 是否清理？
+     > - **A：归档到 `_archive/` 后开始**（推荐 — 移走但不删除）
+     > - **B：直接删除后开始**
+     > - **C：保留，直接开始**（不推荐）
+   - 同时检查工作目录根下的孤立状态文件（`progress.md`、`task_plan.md`、`findings.md`、`tmp/`、`generated/`），一并列入清理范围。
+   - 用户选 A 时：`mkdir -p _archive && mv {dirs} _archive/`，同时移走孤立状态文件。
+   - 用户选 B 时：`rm -rf {dirs}` 及孤立状态文件。
+   - 用户选 C 或无历史残留时：跳过，继续下一步。
+
+2. 读取环境变量覆盖默认值：
 ```bash
 # 读取所有 RESEARCH_* 环境变量
 RESEARCH_DEPTH="${RESEARCH_DEPTH:-standard}"
@@ -87,22 +106,22 @@ RESEARCH_CLI_TIMEOUT="${RESEARCH_CLI_TIMEOUT:-600000}"
 RESEARCH_LANG="${RESEARCH_LANG:-zh}"
 ```
 
-2. 如果设置了 `RESEARCH_DEPTH`，先应用对应预设，再用环境变量中的具体参数覆盖
+3. 如果设置了 `RESEARCH_DEPTH`，先应用对应预设，再用环境变量中的具体参数覆盖
 
-3. 检查 CLI 工具可用性：
+4. 检查 CLI 工具可用性：
 ```bash
 command -v codex && codex --version || echo "CODEX_UNAVAILABLE"
 command -v gemini && gemini --version || echo "GEMINI_UNAVAILABLE"
 ```
 如果配置了某 CLI 但不可用，自动从 `RESEARCH_CLI_TOOLS` 中移除并提示用户。
 
-4. 通过 AskUserQuestion 展示配置，让用户确认或调整：
+5. 通过 AskUserQuestion 展示配置，让用户确认或调整：
    - 选项 A：使用当前配置开始
    - 选项 B：调整参数（逐项询问需修改的值）
    - 选项 C：切换为深度调研模式
    - 选项 D：切换为快速调研模式
 
-5. 创建项目目录，将最终配置写入 `{topic-slug}/config.md`
+6. 创建项目目录，将最终配置写入 `{topic-slug}/config.md`
 
 ### 阶段 1：主题分析与角色动态分配
 

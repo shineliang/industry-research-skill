@@ -91,7 +91,27 @@ metadata:
 
 收到调研主题后，**先完成配置再开始调研**：
 
-1. 用 `exec` 读取环境变量：
+1. **检查历史调研残留（防污染）**：
+   用 `exec` 扫描工作目录下是否存在历史调研产出：
+   ```bash
+   ls -d */round-1 */merged */output 2>/dev/null | sed 's|/.*||' | sort -u
+   ```
+   - **如果发现历史调研目录**：向用户列出这些目录及其创建时间，并询问：
+     > 检测到以下历史调研目录，它们可能干扰本次调研（旧报告内容可能被误引用、旧 progress/task_plan 可能干扰状态判断）：
+     > - `{dir1}/` ({date1})
+     > - `{dir2}/` ({date2})
+     >
+     > 是否清理？
+     > - **A：归档到 `_archive/` 后开始**（推荐 — 移走但不删除）
+     > - **B：直接删除后开始**
+     > - **C：保留，直接开始**（不推荐）
+   - 同时检查工作目录根下的孤立状态文件（`progress.md`、`task_plan.md`、`findings.md`、`tmp/`、`generated/`），一并列入清理范围。
+   - 用户选 A 时：`mkdir -p _archive && mv {dirs} _archive/`，同时移走孤立状态文件。
+   - 用户选 B 时：`rm -rf {dirs}` 及孤立状态文件。
+   - 用户选 C 或无历史残留时：跳过，继续下一步。
+   - **重要：等待用户回复后再继续。**
+
+2. 用 `exec` 读取环境变量：
 ```bash
 echo "RESEARCH_DEPTH=${RESEARCH_DEPTH:-standard}"
 echo "RESEARCH_AGENT_COUNT=${RESEARCH_AGENT_COUNT:-auto}"
@@ -106,9 +126,9 @@ echo "RESEARCH_MODELS=${RESEARCH_MODELS:-}"
 echo "RESEARCH_LANG=${RESEARCH_LANG:-zh}"
 ```
 
-2. 如果设置了 `RESEARCH_DEPTH`，先应用对应预设，再用环境变量中的具体参数覆盖
+3. 如果设置了 `RESEARCH_DEPTH`，先应用对应预设，再用环境变量中的具体参数覆盖
 
-3. 检查 CLI 工具可用性：
+4. 检查 CLI 工具可用性：
 ```bash
 command -v codex && codex --version || echo "CODEX_UNAVAILABLE"
 command -v gemini && gemini --version || echo "GEMINI_UNAVAILABLE"
@@ -116,7 +136,17 @@ command -v claude && claude --version || echo "CLAUDE_UNAVAILABLE"
 ```
 如果配置了某 CLI 但不可用，自动从 `RESEARCH_CLI_TOOLS` 中移除并提示用户。
 
-4. 向用户展示配置表并请求确认（直接输出，等待用户回复）：
+5. **检测当前 session 模型（模型继承）**：
+   子 agent 必须继承主 session 当前使用的模型，而非回退到 openclaw.json 默认值。
+   你（主 agent）应当知道自己当前运行的模型 ID（例如 `openai-codex/gpt-5.3-codex-spark`、`openai-codex/gpt-5.4`、`google/gemini-2.5-pro` 等）。
+   如果不确定，可用 `exec` 尝试获取：
+   ```bash
+   curl -s http://localhost:18789/api/session/info 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin).get('model','UNKNOWN'))" || echo "UNKNOWN"
+   ```
+   将模型 ID 记录为 `inheritedModel`，写入 config.md。
+   **后续所有 `sessions_spawn` 调用必须传入 `model: {inheritedModel}`，确保子 agent 与主 session 使用同一模型。**
+
+6. 向用户展示配置表并请求确认（直接输出，等待用户回复）：
    - 选项 A：使用当前配置开始
    - 选项 B：调整参数（逐项询问需修改的值）
    - 选项 C：切换为深度调研模式
@@ -124,7 +154,7 @@ command -v claude && claude --version || echo "CLAUDE_UNAVAILABLE"
 
 **重要：输出选项后停止，等待用户回复再继续执行。**
 
-5. 创建项目目录，将最终配置写入 `{topic-slug}/config.md`：
+7. 创建项目目录，将最终配置写入 `{topic-slug}/config.md`：
 ```bash
 mkdir -p "{topic-slug}/round-1" "{topic-slug}/merged" "{topic-slug}/output"
 ```
@@ -146,10 +176,10 @@ mkdir -p "{topic-slug}/round-1" "{topic-slug}/merged" "{topic-slug}/output"
 
 5. **立即用 `sessions_spawn` 逐个启动 N 个研究 agent**（每个用不同 label）。这是必须调用的工具，不可跳过：
 
-**cli 模式**（默认）：所有 agent 使用默认模型，prompt 中包含 CLI 交叉验证指令
+**cli 模式**（默认）：所有 agent 继承主 session 模型，prompt 中包含 CLI 交叉验证指令
 ```
-sessions_spawn({ task: "...(含 CLI 交叉验证指令)", label: "researcher-market-analyst", mode: "run", runTimeoutSeconds: 900 })
-sessions_spawn({ task: "...(含 CLI 交叉验证指令)", label: "researcher-tech-trend", mode: "run", runTimeoutSeconds: 900 })
+sessions_spawn({ task: "...(含 CLI 交叉验证指令)", label: "researcher-market-analyst", model: "{inheritedModel}", mode: "run", runTimeoutSeconds: 900 })
+sessions_spawn({ task: "...(含 CLI 交叉验证指令)", label: "researcher-tech-trend", model: "{inheritedModel}", mode: "run", runTimeoutSeconds: 900 })
 ```
 
 **native 模式**：每个 agent 指定不同 model（从 RESEARCH_MODELS 轮询分配）
@@ -190,6 +220,7 @@ sessions_spawn({ task: "...", label: "researcher-app-scenario", model: "openai-c
 sessions_spawn：
   task: {Reviewer Prompt}
   label: "reviewer-round-{N}"
+  model: "{inheritedModel}"
   mode: "run"
   runTimeoutSeconds: 600
 ```
@@ -213,6 +244,7 @@ sessions_spawn：
 sessions_spawn：
   task: {Merger Prompt}
   label: "merger-{M}"
+  model: "{inheritedModel}"
   mode: "run"
   runTimeoutSeconds: 900
 ```
@@ -477,6 +509,7 @@ spawn 每个研究 agent 时，使用以下 prompt（替换 `{...}` 变量）：
 5. **阶段 5**：`read` 合并稿 → 润色 → `write` output/report.md → 展示摘要
 
 **核心规则：**
+- **模型继承**：所有模式下，`sessions_spawn` 都必须带 `model` 参数。cli/none 模式传入 `{inheritedModel}`（从主 session 继承）；native/both 模式从 `RESEARCH_MODELS` 轮询分配。**绝不可省略 model 参数让子 agent 回退到 openclaw.json 默认值。**
 - **只有阶段 0 允许等待用户回复。阶段 1 到阶段 5 应连续执行。**
 - **cli/both 模式下**：研究 agent 的 prompt 必须包含 CLI 交叉验证协议，且协议中明确标注"必须执行，不可跳过"。
 - **native/both 模式下**：`sessions_spawn` 必须带 `model` 参数，从 `RESEARCH_MODELS` 轮询分配。Reviewer 和 Merger 使用与多数研究 agent 不同的模型。
