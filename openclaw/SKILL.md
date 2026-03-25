@@ -9,6 +9,15 @@ description: |
   All parameters are configurable via environment variables or interactive setup.
 
   Trigger: /research, 行业调研, industry research, 调研报告
+metadata:
+  openclaw:
+    emoji: "\U0001F50D"
+    homepage: https://github.com/shineliang/industry-research-skill
+    requires:
+      anyBins:
+        - codex
+        - gemini
+        - claude
 ---
 
 # 多智能体协同行业调研（OpenClaw 版）

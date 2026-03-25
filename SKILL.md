@@ -10,6 +10,14 @@ description: |
   Trigger: /research, 行业调研, industry research, 调研报告
 metadata:
   version: 1.0.0
+  openclaw:
+    emoji: "\U0001F50D"
+    homepage: https://github.com/shineliang/industry-research-skill
+    requires:
+      anyBins:
+        - codex
+        - gemini
+        - claude
 ---
 
 # 多智能体协同行业调研
